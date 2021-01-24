@@ -5,20 +5,22 @@ const events = {
 
 const extensions = {
     // chapter formats
-    img:  'img',
-    cbz:  '.cbz',
-    pdf:  '.pdf',
+    img: 'img',
+    cbz: '.cbz',
+    pdf: '.pdf',
     epub: '.epub',
     // history formats
     none: '',
     json: '.json',
-    csv:  '.csv'
+    csv: '.csv'
 };
 
 const mimes = {
     webp: 'image/webp',
     jpeg: 'image/jpeg',
-    png: 'image/png'
+    png: 'image/png',
+    html: 'text/html',
+    text: 'text/plain'
 };
 
 const types = {
@@ -37,13 +39,13 @@ export default class Settings extends EventTarget {
     // TODO: use dependency injection instead of globals for Engine.Storage, Engine.Conenctors
     constructor() {
         super();
-        let app = require( 'electron' ).remote.app;
-        let path = require( 'path' );
+        let app = require('electron').remote.app;
+        let path = require('path');
         let docs = undefined;
         try {
             // on some circumstances the documents directory might not be found by electron
-            docs = app.getPath( 'documents' );
-        } catch ( e ) {
+            docs = app.getPath('documents');
+        } catch (e) {
             docs = '.';
         }
 
@@ -73,7 +75,7 @@ export default class Settings extends EventTarget {
             label: 'Manga Directory',
             description: 'The base directory where all downloaded mangas will be stored',
             input: types.directory,
-            value: path.join( docs, 'Mangas' )
+            value: path.join(docs, 'Mangas')
         };
 
         this.bookmarkDirectory = {
@@ -83,7 +85,7 @@ export default class Settings extends EventTarget {
                 'This setting has no effect when the application is in portable mode!'
             ].join('\n'),
             input: process.env.HAKUNEKO_PORTABLE ? types.disabled : types.directory,
-            value: app.getPath( 'userData' )
+            value: app.getPath('userData')
         };
 
         this.useSubdirectory = {
@@ -107,7 +109,7 @@ export default class Settings extends EventTarget {
                 '  %CH% - Chapter number',
                 '  %T% - Chapter title (without volume/chapter number)',
                 '  %O% - Chapter title (original)'
-            ].join( '\n' ),
+            ].join('\n'),
             input: types.text,
             value: ''
         };
@@ -131,7 +133,7 @@ export default class Settings extends EventTarget {
                 'Select the re-compression format that shall be used for scrambled images.',
                 'Only applies to scrambled images!',
                 'Unscrambled images are stored natively (no re-compression will be applied).'
-            ].join( '\n' ),
+            ].join('\n'),
             input: types.select,
             options: [
                 { value: mimes.webp, name: 'WEBP (*.webp)' },
@@ -146,7 +148,7 @@ export default class Settings extends EventTarget {
             description: [
                 'Select the re-compression quality that shall be used for scrambled images.',
                 'Only applies to WEBP and JPEG, has no effect on PNG (which is lossless).'
-            ].join( '\n' ),
+            ].join('\n'),
             input: types.numeric,
             min: 50,
             max: 100,
@@ -164,7 +166,7 @@ export default class Settings extends EventTarget {
                 '  http=127.0.0.1:8080;https=127.0.0.1:8080;socks=127.0.0.1:8081',
                 '',
                 'More info: https://git.io/hakuneko-proxy'
-            ].join( '\n' ),
+            ].join('\n'),
             input: types.text,
             value: ''
         };
@@ -178,7 +180,7 @@ export default class Settings extends EventTarget {
                 '',
                 'Examples:',
                 '  username:password'
-            ].join( '\n' ),
+            ].join('\n'),
             input: types.password,
             value: ''
         };
@@ -195,7 +197,7 @@ export default class Settings extends EventTarget {
                 '  68e89cc3-4c2d-4539-b80b-49ba4bec76c4',
                 '',
                 'More info: https://www.hcaptcha.com/accessibility'
-            ].join( '\n' ),
+            ].join('\n'),
             input: types.text,
             value: ''
         };
@@ -205,7 +207,7 @@ export default class Settings extends EventTarget {
             description: [
                 'Log the history of completed chapter downloads.',
                 'The log file(s) can be found in HakuNeko\'s user data directory.'
-            ].join( '\n' ),
+            ].join('\n'),
             input: types.select,
             options: [
                 { value: extensions.none, name: 'Disabled' },
@@ -233,7 +235,7 @@ export default class Settings extends EventTarget {
                 'Examples:',
                 '  convert "%PATH%\\*.webp" -scene 1 "%PATH%\\%03d.png"',
                 '  md "%O%_conv" & convert "%PATH%\\*.*" -scene 1 "%O%_conv\\%03d.png"'
-            ].join( '\n' ),
+            ].join('\n'),
             input: types.text,
             value: ''
         };
@@ -244,7 +246,7 @@ export default class Settings extends EventTarget {
                 'Provides what you are currently reading as discord activity',
                 'information to the public.',
                 ''
-            ].join( '\n' ),
+            ].join('\n'),
             input: types.select,
             options: [
                 { value: 'none', name: 'No presence' },
@@ -253,12 +255,27 @@ export default class Settings extends EventTarget {
             ],
             value: 'none'
         };
+
+        this.novelFormat = {
+            label: 'novel Format',
+            description: [
+                'The format that novels are downlaoded in',
+                ''
+            ].join('\n'),
+            input: types.select,
+            options: [
+                { value: mimes.html, name: 'HTML (*.HTML)' },
+                { value: mimes.text, name: 'plain text (.txt)' },
+                { value: 'none', name: 'Use image' },
+            ],
+            value: 'none'
+        };
     }
 
     *[Symbol.iterator]() {
-        for(let key in this) {
+        for (let key in this) {
             let property = this[key];
-            if(property instanceof Object && property.input) {
+            if (property instanceof Object && property.input) {
                 yield property;
             }
         }
@@ -269,8 +286,8 @@ export default class Settings extends EventTarget {
             category: 'General',
             settings: [...this]
         };
-        for(let connector of Engine.Connectors) {
-            if(connector.config instanceof Object) {
+        for (let connector of Engine.Connectors) {
+            if (connector.config instanceof Object) {
                 yield {
                     category: connector.label,
                     settings: Object.keys(connector.config).map(key => connector.config[key])
@@ -287,8 +304,8 @@ export default class Settings extends EventTarget {
         try {
             let data = await Engine.Storage.loadConfig('settings');
             // apply general settings
-            for(let key in this) {
-                if(data
+            for (let key in this) {
+                if (data
                     && data[key] !== undefined
                     && this[key]
                     && this[key].input
@@ -298,9 +315,9 @@ export default class Settings extends EventTarget {
                 }
             }
             // apply settings to each connector
-            for(let connector of Engine.Connectors) {
-                for(let key in connector.config) {
-                    if(data
+            for (let connector of Engine.Connectors) {
+                for (let key in connector.config) {
+                    if (data
                         && data.connectors
                         && data.connectors[connector.id]
                         && data.connectors[connector.id][key] !== undefined
@@ -312,7 +329,7 @@ export default class Settings extends EventTarget {
                 }
             }
             this.dispatchEvent(new CustomEvent(events.loaded, { detail: this }));
-        } catch(error) {
+        } catch (error) {
             console.error('Failed to load HakuNeko settings!', error);
         }
     }
@@ -321,22 +338,22 @@ export default class Settings extends EventTarget {
         try {
             let data = {};
             // gather general settings
-            for(let key in this) {
-                if(this[key] && this[key].input && this[key].input !== types.disabled) {
+            for (let key in this) {
+                if (this[key] && this[key].input && this[key].input !== types.disabled) {
                     data[key] = this._getEncryptedValue(this[key].input, this[key].value);
                 }
             }
             // gather settings from each connector
             data['connectors'] = {};
-            for(let connector of Engine.Connectors) {
+            for (let connector of Engine.Connectors) {
                 data.connectors[connector.id] = {};
-                for(let key in connector.config) {
+                for (let key in connector.config) {
                     data.connectors[connector.id][key] = this._getEncryptedValue(connector.config[key].input, connector.config[key].value);
                 }
             }
             await Engine.Storage.saveConfig('settings', data, 2);
             this.dispatchEvent(new CustomEvent(events.saved, { detail: this }));
-        } catch(error) {
+        } catch (error) {
             console.error('Failed to save HakuNeko settings!', error);
         }
     }
@@ -347,7 +364,7 @@ export default class Settings extends EventTarget {
      * @param decryptedValue
      */
     _getEncryptedValue(inputType, decryptedValue) {
-        if(inputType !== types.password || !decryptedValue || decryptedValue.length < 1) {
+        if (inputType !== types.password || !decryptedValue || decryptedValue.length < 1) {
             return decryptedValue;
         }
         return CryptoJS.AES.encrypt(decryptedValue, 'HakuNeko!').toString();
@@ -359,7 +376,7 @@ export default class Settings extends EventTarget {
      * @param encryptedValue
      */
     _getDecryptedValue(inputType, encryptedValue) {
-        if(inputType !== types.password || !encryptedValue || encryptedValue.length < 1) {
+        if (inputType !== types.password || !encryptedValue || encryptedValue.length < 1) {
             return encryptedValue;
         }
         return CryptoJS.AES.decrypt(encryptedValue, 'HakuNeko!').toString(CryptoJS.enc.Utf8);
@@ -370,12 +387,12 @@ export default class Settings extends EventTarget {
      */
     _getValidValue(scope, setting, silent) {
         let value = setting.value;
-        switch(setting.input) {
+        switch (setting.input) {
             case types.numeric:
-                if(setting.min !== undefined && value < setting.min) {
+                if (setting.min !== undefined && value < setting.min) {
                     return setting.min;
                 }
-                if(setting.max !== undefined && value > setting.max) {
+                if (setting.max !== undefined && value > setting.max) {
                     return setting.max;
                 }
                 return value;
@@ -383,7 +400,7 @@ export default class Settings extends EventTarget {
                 Engine.Storage.directoryExist(value)
                     .catch(error => {
                         let message = `WARNING: Cannot access the directory for "${setting.label}" from "${scope}" settings!\n\n${error.message}`;
-                        if(silent) {
+                        if (silent) {
                             console.warn(message, error);
                         } else {
                             alert(message);

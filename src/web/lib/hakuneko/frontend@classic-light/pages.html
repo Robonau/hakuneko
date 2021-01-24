@@ -268,7 +268,7 @@
                 // TODO: abort any pending page request (maybe store current request in global variable?)
                 chapter.getPages( ( error, media ) => {
                     if( chapter === this.selectedChapter ) {
-                        this.set( 'media', media );
+                        this.set( 'media', media.img ? media.img : media );
                         if( error ) {
                             alert( error.message );
                         }

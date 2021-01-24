@@ -15,7 +15,7 @@ const statusDefinitions = {
 export default class DownloadJob extends EventTarget {
 
     // TODO: use dependency injection instead of globals for Engine.Storage, Enums
-    constructor( chapter ) {
+    constructor(chapter) {
         super();
         this.id = Symbol();
         this.chapter = chapter;
@@ -36,7 +36,7 @@ export default class DownloadJob extends EventTarget {
     /**
      *
      */
-    isSame( job ) {
+    isSame(job) {
         // comparing chapter objects works, because chapters for each manga are cached
         return this.chapter === job.chapter;
         //return ( this.chapter.id === job.chapter.id && this.chapter.manga.id === job.chapter.manga.id && this.chapter.manga.connector.id === job.chapter.manga.connector.id );
@@ -45,114 +45,119 @@ export default class DownloadJob extends EventTarget {
     /**
      * Apply a new status for the job and publish the corresponding event.
      */
-    setStatus( status ) {
-        if( status !== this.status ) {
+    setStatus(status) {
+        if (status !== this.status) {
             this.status = status;
-            this.chapter.setStatus( status );
+            this.chapter.setStatus(status);
             this.chapter.manga.updateStatus();
-            this.dispatchEvent( new CustomEvent( events.updated, { detail: this } ) );
+            this.dispatchEvent(new CustomEvent(events.updated, { detail: this }));
         }
     }
 
     /**
      * Apply a new status for the job and publish the corresponding event.
      */
-    setProgress( progress ) {
-        if( progress !== this.progress ) {
+    setProgress(progress) {
+        if (progress !== this.progress) {
             this.progress = progress;
-            this.dispatchEvent( new CustomEvent( events.updated, { detail: this } ) );
+            this.dispatchEvent(new CustomEvent(events.updated, { detail: this }));
         }
     }
 
     /**
      *
      */
-    downloadPages( directory, callback ) {
-        this.setStatus( statusDefinitions.downloading );
-        this.chapter.getPages( ( error, data ) => {
-            if( !error && data ) {
+    downloadPages(directory, callback) {
+        this.setStatus(statusDefinitions.downloading);
+        this.chapter.getPages((error, data) => {
+            if (!error && data) {
                 // manga pages
-                if( data instanceof Array ) {
-                    this._downloadPages( data, directory, callback );
+                if (data instanceof Array) {
+                    this._downloadPages(data, directory, callback);
                     return;
                 }
                 // anime playlist
-                if( data.mirrors instanceof Array ) {
-                    this._downloadPlaylistHLS( data, directory, callback );
+                if (data.mirrors instanceof Array) {
+                    this._downloadPlaylistHLS(data, directory, callback);
                     return;
                 }
                 // anime stream
-                if( typeof data.video === 'string' ) {
-                    this._downloadVideoStream( data, directory, callback );
+                if (typeof data.video === 'string') {
+                    this._downloadVideoStream(data, directory, callback);
+                    return;
+                }
+                // novel
+                if (data.img instanceof Array) {
+                    this._downloadNovel(data, directory, callback);
                     return;
                 }
             }
 
-            if( error ) {
-                this.errors.push( error );
+            if (error) {
+                this.errors.push(error);
             } else {
-                this.errors.push( new Error( 'Page list is empty' ) );
+                this.errors.push(new Error('Page list is empty'));
             }
-            this.setStatus( statusDefinitions.failed );
-            this.setProgress( 100 );
+            this.setStatus(statusDefinitions.failed);
+            this.setProgress(100);
             callback();
-        } );
+        });
     }
 
     /**
      * Return a promise that will be resolved after the given amount of time in milliseconds
      */
-    _wait( time ) {
-        return new Promise( resolve => {
-            setTimeout( resolve, time );
-        } );
+    _wait(time) {
+        return new Promise(resolve => {
+            setTimeout(resolve, time);
+        });
     }
 
     /**
      *
      */
-    _downloadPages( pages, directory, callback ) {
+    _downloadPages(pages, directory, callback) {
         // get data for all pages of chapter
-        let promises = pages.map( ( page, index ) => {
-            return this._wait( index * this.throttle )
-                .then( () => fetch( page, this.requestOptions ) )
-                .then( response => {
-                    if( response.status !== 200 ) {
-                        throw new Error( 'Page "' + page + '" returned status: ' + response.status + ' - ' + response.statusText );
+        let promises = pages.map((page, index) => {
+            return this._wait(index * this.throttle)
+                .then(() => fetch(page, this.requestOptions))
+                .then(response => {
+                    if (response.status !== 200) {
+                        throw new Error('Page "' + page + '" returned status: ' + response.status + ' - ' + response.statusText);
                     }
                     return response.blob();
-                } )
-                .then( data => {
-                    this.setProgress( this.progress + ( pages.length ? 100/pages.length : 0 ) );
-                    return Promise.resolve( data );
-                } );
-        } );
-        Promise.all( promises )
-            .then( values => {
-                return Engine.Storage.saveChapterPages( this.chapter, values );
-            } )
-            .then( () => {
-                this.setProgress( 100 );
-                this.setStatus( statusDefinitions.completed );
+                })
+                .then(data => {
+                    this.setProgress(this.progress + (pages.length ? 100 / pages.length : 0));
+                    return Promise.resolve(data);
+                });
+        });
+        Promise.all(promises)
+            .then(values => {
+                return Engine.Storage.saveChapterPages(this.chapter, values);
+            })
+            .then(() => {
+                this.setProgress(100);
+                this.setStatus(statusDefinitions.completed);
                 callback();
-            } )
-            .catch( error => {
-            /*
-             * TODO: abort/block all other page downloads that are still running for this job ...
-             * https://stackoverflow.com/questions/31424561/wait-until-all-es6-promises-complete-even-rejected-promises
-             */
-                this.errors.push( error );
-                console.error( error, pages );
-                this.setProgress( 100 );
-                this.setStatus( statusDefinitions.failed );
+            })
+            .catch(error => {
+                /*
+                 * TODO: abort/block all other page downloads that are still running for this job ...
+                 * https://stackoverflow.com/questions/31424561/wait-until-all-es6-promises-complete-even-rejected-promises
+                 */
+                this.errors.push(error);
+                console.error(error, pages);
+                this.setProgress(100);
+                this.setStatus(statusDefinitions.failed);
                 callback();
-            } );
+            });
     }
 
     /**
      *
      */
-    _downloadPlaylistHLS( episode, directory, callback ) {
+    _downloadPlaylistHLS(episode, directory, callback) {
         let ffmpeg = {
             command: ['ffmpeg', '-loglevel', 'error', '-allowed_extensions', 'ALL'],
             inputs: [],
@@ -160,30 +165,30 @@ export default class DownloadJob extends EventTarget {
             metas: []
         };
         let playlistURL = undefined;
-        let promises = episode.mirrors.map( mirror => {
+        let promises = episode.mirrors.map(mirror => {
             let request = new Request(mirror, this.requestOptions);
-            if(episode.referer) {
+            if (episode.referer) {
                 request.headers.set('x-referer', episode.referer);
             }
             return fetch(request)
-                .then( response => {
-                    if( response.status !== 200 ) {
-                        throw new Error( 'Playlist "' + mirror + '" returned status: ' + response.status + ' - ' + response.statusText );
+                .then(response => {
+                    if (response.status !== 200) {
+                        throw new Error('Playlist "' + mirror + '" returned status: ' + response.status + ' - ' + response.statusText);
                     }
                     return response.text();
-                } )
-            // swap resolve and reject so we can use Promise.all to get the first "resolved" promise
-                .then( data => {
+                })
+                // swap resolve and reject so we can use Promise.all to get the first "resolved" promise
+                .then(data => {
                     playlistURL = playlistURL || mirror;
-                    return Promise.reject( data );
+                    return Promise.reject(data);
                 }, error => {
-                    return Promise.resolve( error );
-                } );
-        } );
-        Promise.all( promises )
-        // swap the rejected promise back to its initial resolved state
-            .catch( data => Promise.resolve( data ) )
-            .then( playlist => {
+                    return Promise.resolve(error);
+                });
+        });
+        Promise.all(promises)
+            // swap the rejected promise back to its initial resolved state
+            .catch(data => Promise.resolve(data))
+            .then(playlist => {
                 let packets = [...new Set(playlist.match(/^[^\s#].+$/gm))];
                 packets = packets.map((packet, index) => {
                     return {
@@ -193,7 +198,7 @@ export default class DownloadJob extends EventTarget {
                     };
                 });
                 let key = playlist.match(/URI\s*=\s*"(.*?)"/);
-                if(key) {
+                if (key) {
                     packets.push({
                         needle: key[1],
                         source: new URL(key[1], playlistURL),
@@ -201,189 +206,214 @@ export default class DownloadJob extends EventTarget {
                     });
                 }
                 // modify playlist to use local files
-                for(let packet of packets) {
+                for (let packet of packets) {
                     //playlist = playlist.replace(new RegExp(packet.needle, 'g'), packet.target);
                     playlist = playlist.split(packet.needle).join(packet.target);
                 }
-                ffmpeg.inputs.push( '-i', '"media.m3u8"' );
-                return Engine.Storage.saveChapterFileM3U8( this.chapter, { name: 'media.m3u8', data: playlist } )
-                    .then( () => {
-                        return Promise.resolve( packets );
-                    } );
-            } )
-        // download all packets
-            .then( packets => {
-                let promises = packets.map( ( packet, index ) => {
-                    return this._wait( index * this.throttle )
-                        .then( () => {
+                ffmpeg.inputs.push('-i', '"media.m3u8"');
+                return Engine.Storage.saveChapterFileM3U8(this.chapter, { name: 'media.m3u8', data: playlist })
+                    .then(() => {
+                        return Promise.resolve(packets);
+                    });
+            })
+            // download all packets
+            .then(packets => {
+                let promises = packets.map((packet, index) => {
+                    return this._wait(index * this.throttle)
+                        .then(() => {
                             let request = new Request(packet.source, this.requestOptions);
-                            if(episode.referer) {
+                            if (episode.referer) {
                                 request.headers.set('x-referer', episode.referer);
                             }
                             return fetch(request);
-                        } )
-                        .then( response => {
-                            if( response.status !== 200 ) {
-                                throw new Error( 'Packet "' + packet.link + '" returned status: ' + response.status + ' - ' + response.statusText );
+                        })
+                        .then(response => {
+                            if (response.status !== 200) {
+                                throw new Error('Packet "' + packet.link + '" returned status: ' + response.status + ' - ' + response.statusText);
                             }
                             return response.arrayBuffer();
-                        } )
-                        .then( data => {
-                            return Engine.Storage.saveChapterFileM3U8( this.chapter, { name: packet.target, data: new Uint8Array( data ) } );
-                        } )
-                        .then( () => {
-                            this.setProgress( this.progress + 100/packets.length );
-                        } );
-                } );
-                return Promise.all( promises );
-            } )
-        // download all subtitles
-            .then( () => {
-                let promises = episode.subtitles.map( ( subtitle, index ) => {
+                        })
+                        .then(data => {
+                            return Engine.Storage.saveChapterFileM3U8(this.chapter, { name: packet.target, data: new Uint8Array(data) });
+                        })
+                        .then(() => {
+                            this.setProgress(this.progress + 100 / packets.length);
+                        });
+                });
+                return Promise.all(promises);
+            })
+            // download all subtitles
+            .then(() => {
+                let promises = episode.subtitles.map((subtitle, index) => {
                     let file = 'media.' + subtitle.locale + '.' + subtitle.format;
-                    ffmpeg.inputs.push( '-i', `"${file}"` );
-                    ffmpeg.maps.push( '-map', index + 1 + ':s' );
-                    ffmpeg.metas.push( '-metadata:s:s:' + index, 'language=' + subtitle.locale );
+                    ffmpeg.inputs.push('-i', `"${file}"`);
+                    ffmpeg.maps.push('-map', index + 1 + ':s');
+                    ffmpeg.metas.push('-metadata:s:s:' + index, 'language=' + subtitle.locale);
                     // make english the default subtitle
-                    if( subtitle.locale.toLowerCase() === 'en-us' ) {
-                        ffmpeg.metas.push( '-disposition:s:' + index, 'default' );
+                    if (subtitle.locale.toLowerCase() === 'en-us') {
+                        ffmpeg.metas.push('-disposition:s:' + index, 'default');
                     }
-                    return this._wait( index * 50 )
-                        .then( () => {
+                    return this._wait(index * 50)
+                        .then(() => {
                             let request = new Request(subtitle.url, this.requestOptions);
-                            if(episode.referer) {
+                            if (episode.referer) {
                                 request.headers.set('x-referer', episode.referer);
                             }
                             return fetch(request);
-                        } )
-                        .then( response => {
-                            if( response.status !== 200 ) {
-                                throw new Error( 'Subtitle "' + subtitle.url + '" returned status: ' + response.status + ' - ' + response.statusText );
+                        })
+                        .then(response => {
+                            if (response.status !== 200) {
+                                throw new Error('Subtitle "' + subtitle.url + '" returned status: ' + response.status + ' - ' + response.statusText);
                             }
                             return response.text();
-                        } )
-                        .then( data => {
-                            return Engine.Storage.saveChapterFileM3U8( this.chapter, { name: file, data: data } );
-                        } );
-                } );
-                return Promise.all( promises );
-            } )
-        // multiplex
-            .then( () => {
-            // compose ffmpeg command for multiplexing
+                        })
+                        .then(data => {
+                            return Engine.Storage.saveChapterFileM3U8(this.chapter, { name: file, data: data });
+                        });
+                });
+                return Promise.all(promises);
+            })
+            // multiplex
+            .then(() => {
+                // compose ffmpeg command for multiplexing
                 let args = ffmpeg.command;
-                args = args.concat( ffmpeg.inputs );
-                args = args.concat( ffmpeg.maps );
-                args = args.concat( ffmpeg.metas );
-                args = args.concat( [ '-c', 'copy' ] );
+                args = args.concat(ffmpeg.inputs);
+                args = args.concat(ffmpeg.maps);
+                args = args.concat(ffmpeg.metas);
+                args = args.concat(['-c', 'copy']);
                 // multiplex media
-                return Engine.Storage.muxPlaylistM3U8( this.chapter, args.join( ' ' ) );
-            } )
-        // finalize
-            .then( () => {
-                this.setProgress( 100 );
-                this.setStatus( statusDefinitions.completed );
+                return Engine.Storage.muxPlaylistM3U8(this.chapter, args.join(' '));
+            })
+            // finalize
+            .then(() => {
+                this.setProgress(100);
+                this.setStatus(statusDefinitions.completed);
                 callback();
-            } )
-        // process error
-            .catch( error => {
-            /*
-             * TODO: abort/block all other packet downloads that are still running for this job ...
-             * https://stackoverflow.com/questions/31424561/wait-until-all-es6-promises-complete-even-rejected-promises
-             */
-                this.errors.push( error );
-                console.error( error, episode );
-                this.setProgress( 100 );
-                this.setStatus( statusDefinitions.failed );
+            })
+            // process error
+            .catch(error => {
+                /*
+                 * TODO: abort/block all other packet downloads that are still running for this job ...
+                 * https://stackoverflow.com/questions/31424561/wait-until-all-es6-promises-complete-even-rejected-promises
+                 */
+                this.errors.push(error);
+                console.error(error, episode);
+                this.setProgress(100);
+                this.setStatus(statusDefinitions.failed);
                 callback();
-            } );
+            });
     }
 
     // TODO: read from the stream directly to the file instead of processing chunks
     // => https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream | response.body.pipe(...)
-    _downloadVideoStream( episode, directory, callback ) {
+    _downloadVideoStream(episode, directory, callback) {
         let basename = Date.now(); // episode.video.split( '/' ).pop();
         this.requestOptions['method'] = 'HEAD';
-        let request = new Request( episode.video, this.requestOptions );
-        request.headers.set( 'x-referer', episode.referer || episode.video );
+        let request = new Request(episode.video, this.requestOptions);
+        request.headers.set('x-referer', episode.referer || episode.video);
         this.requestOptions['method'] = 'GET';
-        fetch( request )
-            .then( response => {
-                if( response.status !== 200 ) {
-                    throw new Error( 'Video "' + episode.video + '" returned status: ' + response.status + ' - ' + response.statusText );
+        fetch(request)
+            .then(response => {
+                if (response.status !== 200) {
+                    throw new Error('Video "' + episode.video + '" returned status: ' + response.status + ' - ' + response.statusText);
                 }
                 /*
                  *if( response.headers.get( 'Accept-Ranges' ).toLowerCase() !== 'bytes' ) {
                  *    throw new Error( 'Video "' + episode.video + '" does not accept chunked download!' );
                  *}
                  */
-                let size = response.headers.get( 'Content-Length' );
-                if( !size ) {
-                    throw new Error( 'Failed to determine the size of the video packet!\nThe server may not use "Access-Control-Expose-Headers: Content-Length" for CORS requests.' );
+                let size = response.headers.get('Content-Length');
+                if (!size) {
+                    throw new Error('Failed to determine the size of the video packet!\nThe server may not use "Access-Control-Expose-Headers: Content-Length" for CORS requests.');
                 }
-                return Promise.resolve( parseInt( size ) );
-            } )
-            .then( size => {
-                let fn = ( chunks, index, files ) => {
+                return Promise.resolve(parseInt(size));
+            })
+            .then(size => {
+                let fn = (chunks, index, files) => {
                     index = index || 0;
                     files = files || [];
-                    if( index >= chunks.length ) {
-                        return Promise.resolve( files );
+                    if (index >= chunks.length) {
+                        return Promise.resolve(files);
                     }
-                    return this._wait( 0 )
-                        .then( () => {
-                            let request = new Request( episode.video, this.requestOptions );
-                            request.headers.set( 'Range', 'bytes=' + chunks[index] );
-                            request.headers.set( 'x-referer', episode.referer || episode.video );
-                            return fetch( request );
-                        } )
-                        .then( response => {
-                            if( response.status !== 200 && response.status !== 206 ) {
-                                throw new Error( 'Video stream "' + episode.video + '" returned status: ' + response.status + ' - ' + response.statusText );
+                    return this._wait(0)
+                        .then(() => {
+                            let request = new Request(episode.video, this.requestOptions);
+                            request.headers.set('Range', 'bytes=' + chunks[index]);
+                            request.headers.set('x-referer', episode.referer || episode.video);
+                            return fetch(request);
+                        })
+                        .then(response => {
+                            if (response.status !== 200 && response.status !== 206) {
+                                throw new Error('Video stream "' + episode.video + '" returned status: ' + response.status + ' - ' + response.statusText);
                             }
                             return response.arrayBuffer();
-                        } )
-                        .then( data => {
-                            let file = basename + '.part' + ( '00000' + index ).slice( -5 );
-                            return Engine.Storage.saveVideoChunkTemp( { name: file, data: new Uint8Array( data ) } );
-                        } )
-                        .then( tempFile => {
-                            this.setProgress( this.progress + 100/chunks.length );
-                            return fn( chunks, index + 1, files.concat( tempFile ) );
-                        } );
+                        })
+                        .then(data => {
+                            let file = basename + '.part' + ('00000' + index).slice(-5);
+                            return Engine.Storage.saveVideoChunkTemp({ name: file, data: new Uint8Array(data) });
+                        })
+                        .then(tempFile => {
+                            this.setProgress(this.progress + 100 / chunks.length);
+                            return fn(chunks, index + 1, files.concat(tempFile));
+                        });
                 };
-                return fn( this._splitRange( size ) );
-            } )
-        // multiplex
-            .then( tempFiles => Engine.Storage.concatVideoChunks( this.chapter, tempFiles ) )
-        // finalize
-            .then( () => {
-                this.setProgress( 100 );
-                this.setStatus( statusDefinitions.completed );
+                return fn(this._splitRange(size));
+            })
+            // multiplex
+            .then(tempFiles => Engine.Storage.concatVideoChunks(this.chapter, tempFiles))
+            // finalize
+            .then(() => {
+                this.setProgress(100);
+                this.setStatus(statusDefinitions.completed);
                 callback();
-            } )
-        // process error
-            .catch( error => {
-                this.errors.push( error );
-                console.error( error, episode );
-                this.setProgress( 100 );
-                this.setStatus( statusDefinitions.failed );
+            })
+            // process error
+            .catch(error => {
+                this.errors.push(error);
+                console.error(error, episode);
+                this.setProgress(100);
+                this.setStatus(statusDefinitions.failed);
                 callback();
-            } );
+            });
+    }
+
+    _downloadNovel(pages, directory, callback) {
+        // get data for all pages of chapter
+        if (Engine.Settings.novelFormat.value == 'none') {
+            this._downloadPages(pages.img, directory, callback);
+        } else {
+            Engine.Storage.saveChapterNovel(this.chapter, pages)
+                .then(() => {
+                    this.setProgress(100);
+                    this.setStatus(statusDefinitions.completed);
+                    callback();
+                })
+                .catch(error => {
+                    /*
+                     * TODO: abort/block all other page downloads that are still running for this job ...
+                     * https://stackoverflow.com/questions/31424561/wait-until-all-es6-promises-complete-even-rejected-promises
+                     */
+                    this.errors.push(error);
+                    console.error(error, pages);
+                    this.setProgress(100);
+                    this.setStatus(statusDefinitions.failed);
+                    callback();
+                });
+        }
     }
 
     /**
      *
      */
-    _splitRange( size ) {
+    _splitRange(size) {
         let part = this.chunkSize;
-        let chunks = Math.ceil( size / part );
-        chunks = [...new Array( chunks ).keys()];
+        let chunks = Math.ceil(size / part);
+        chunks = [...new Array(chunks).keys()];
         chunks = chunks.map(index => {
             let start = index * part;
             let end = start + part - 1;
-            return start + '-' + Math.min( end, size - 1 );
-        } );
+            return start + '-' + Math.min(end, size - 1);
+        });
         return chunks;
     }
 }

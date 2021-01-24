@@ -36,7 +36,10 @@ export default class WordPressMadaraNovel extends WordPressMadara {
                 script.onload = async function() {
                     try{
                         let canvas = await html2canvas(novel);
-                        resolve(canvas.toDataURL('${this.novelFormat}'));
+                        resolve({
+                            img:[canvas.toDataURL('${this.novelFormat}')],
+                            html:novel.outerHTML 
+                        });
                     }catch (error){
                         reject(error)
                     }
@@ -45,6 +48,6 @@ export default class WordPressMadaraNovel extends WordPressMadara {
                 document.body.appendChild(script);
             });
         `;
-        return [ await Engine.Request.fetchUI(request, script) ];
+        return await Engine.Request.fetchUI(request, script);
     }
 }
