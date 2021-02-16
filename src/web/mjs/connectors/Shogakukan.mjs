@@ -23,7 +23,7 @@ export default class Shogakukan extends Connector {
 
     async _getMangas() {
         let mangaList = [];
-        let request = new Request(new URL('/comics/type/all', this.url), this.requestOptions);
+        let request = new Request(new URL('/comics/type/all?num=80', this.url), this.requestOptions);
         let data = await this.fetchDOM(request, 'div.pagination01 ul li.last a');
         let pageCount = parseInt(data[0].href.match(/page=(\d+)/)[1]);
         console.log('Pages:', pageCount);
@@ -36,8 +36,8 @@ export default class Shogakukan extends Connector {
     }
 
     async _getMangasFromPage(page) {
-        let request = new Request(new URL('/comics/type/all?page=' + page, this.url), this.requestOptions);
-        let data = await this.fetchDOM(request, 'div.card div p.p-1 a', 5);
+        let request = new Request(new URL('/comics/type/all?num=80&page=' + page, this.url), this.requestOptions);
+        let data = await this.fetchDOM(request, 'div p.ttl a', 5);
         return data.map(element => {
             return {
                 id: this.getRootRelativeOrAbsoluteLink(element, request.url),
