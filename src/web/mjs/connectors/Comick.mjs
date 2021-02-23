@@ -28,10 +28,10 @@ export default class ComicClear extends Connector {
         let data = await this.fetchJSON(request);
         return data.pageProps.comic.md_chapters.map(ele => {
             let title = '';
-            if(ele.vol) { // => string, not a number
+            if(ele.vol) {
                 title += 'Vol.' + ele.vol;
             }
-            if(ele.chap) { // => string, not a number
+            if(ele.chap) {
                 title += ' Ch.' + ele.chap;
             }
             if(ele.title) {
